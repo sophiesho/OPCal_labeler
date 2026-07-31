@@ -103,6 +103,14 @@ def render(*, state: StateAdapter, session_service: SessionService, export_servi
             archive_path = export_service.export_session(session_dir)
             state.set("export_done", True)
             st.success(f"Exported: {archive_path}")
+            with open(archive_path, "rb") as f:
+                st.download_button(
+                    label="Download session ZIP",
+                    data=f.read(),
+                    file_name=Path(archive_path).name,
+                    mime="application/zip",
+                    key="download_zip_btn",
+                )
         except Exception as exc:
             st.error(f"Export failed: {exc}")
 
@@ -136,6 +144,14 @@ def render(*, state: StateAdapter, session_service: SessionService, export_servi
             counts = ", ".join(f"{name}: {count}" for name, count in result.counts_by_file.items())
             state.set("export_done", True)
             st.success(f"Exported training CSV bundle: {result.archive_path}")
+            with open(result.archive_path, "rb") as f:
+                st.download_button(
+                    label="Download training CSV ZIP",
+                    data=f.read(),
+                    file_name=Path(result.archive_path).name,
+                    mime="application/zip",
+                    key="download_training_zip_btn",
+                )
             st.caption(counts)
         except Exception as exc:
             st.error(f"Training CSV export failed: {exc}")

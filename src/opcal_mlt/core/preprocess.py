@@ -118,11 +118,23 @@ def pre_post_sd_rect_params(
     """
     Compute parameters for two *floating* SD·k rectangles (pre/post stim).
 
+    Both rectangles are scaled by the **pre-stimulus (baseline) SD**, not each
+    segment's own SD. Technical/instrument noise is present throughout the
+    recording, including during the quiet pre-stimulus period, so the
+    pre-stim SD gives a clean noise-only estimate. Scaling the post-stim
+    rectangle by the post-stim segment's own SD would fold real calcium
+    activity into the "noise" estimate, inflating the band and making it
+    harder to tell a significant post-stim fluctuation from baseline noise.
+    This mirrors the logic used for the actual peak-detection threshold
+    (``thr = baseline + k * sd_pre`` in ``workspace_logic.py``), so the
+    visualized bands now stay consistent with what actually drives peak
+    detection.
+
     Args:
         x (np.ndarray): 1D signal of shape (T,).
         fs_hz (float): Sampling rate in Hertz.
         stim_time_s (float): Time (seconds) at which stimulation starts.
-        k (float, optional): Multiplier applied to the **post** rectangle height via ``ref_post + k·SD_post``. Default is 3.0.
+        k (float, optional): Multiplier applied to the **post** rectangle height via ``ref_post + k·SD_pre``. Default is 3.0.
         ref (str, optional): How to choose the constant reference level per segment. {"mean", "median", "zero"}. Default is "mean".
 
     Returns:
@@ -131,7 +143,7 @@ def pre_post_sd_rect_params(
     n = int(x.size)
     stim_idx = int(max(0, min(n - 1, round(float(stim_time_s) * float(fs_hz)))))
 
-    # --- Pre segment ---
+    # --- Pre segment: establishes the baseline noise SD used for BOTH rectangles ---
     pre = x[:stim_idx] if stim_idx > 0 else x
     ref_normalized = ref.lower().strip()
     if ref_normalized == "median":
@@ -146,15 +158,16 @@ def pre_post_sd_rect_params(
     y0_pre = ref_pre
     y1_pre = ref_pre + sd_pre
 
-    # --- Post segment ---
+    # --- Post segment: own reference level (where the signal actually sits),
+    # but scaled by the SAME baseline sd_pre rather than the post segment's
+    # own SD, so the band reflects "how many baseline-noise-SDs above normal"
+    # the post-stim level is.
     post = x[stim_idx:] if stim_idx < n else x[-1:]
     if ref_normalized == "zero":
         ref_post = 0.0
     else:
         ref_post = float(np.mean(post)) if post.size else 0.0
-    sd_post = robust_sd_from_mad(post - ref_post)
-    sd_post = float(max(sd_post, 1e-9))
     y0_post = ref_post
-    y1_post = ref_post + float(k) * sd_post
+    y1_post = ref_post + float(k) * sd_pre
 
     return float(y0_pre), float(y1_pre), float(y0_post), float(y1_post), int(stim_idx)

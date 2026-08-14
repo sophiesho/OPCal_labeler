@@ -158,16 +158,54 @@ def _render_baseline_section(state: StateAdapter) -> None:
 
 def _render_threshold_section(state: StateAdapter) -> None:
     st.markdown("#### Thresholds")
-    k_value = st.slider(
-        "SD threshold k",
-        min_value=1.0,
-        max_value=6.0,
-        value=float(state.get("k", 3.0)),
-        step=0.5,
-        help="Standard deviation multiplier applied on top of the baseline to flag events.",
-        key="sidebar_threshold_k",
+
+    method_options = {
+        "sd_k": "SD threshold (k × SD)",
+        "adaptive_zv": "Adaptive (Zv + histogram valley)",
+    }
+    method_value = str(state.get("detection_method", "sd_k"))
+    if method_value not in method_options:
+        method_value = "sd_k"
+    method_choice = st.radio(
+        "Peak detection method",
+        options=list(method_options.keys()),
+        index=list(method_options.keys()).index(method_value),
+        format_func=lambda value: method_options[value],
+        help=(
+            "SD threshold uses a fixed baseline + k×SD line. Adaptive (Zv) finds a "
+            "per-cell threshold from the histogram valley between noise and activity, "
+            "then filters out episodes shorter than the minimum peak duration."
+        ),
+        key="sidebar_detection_method",
     )
-    state.set("k", float(k_value))
+    state.set("detection_method", method_choice)
+
+    if method_choice == "sd_k":
+        k_value = st.slider(
+            "SD threshold k",
+            min_value=1.0,
+            max_value=6.0,
+            value=float(state.get("k", 3.0)),
+            step=0.5,
+            help="Standard deviation multiplier applied on top of the baseline to flag events.",
+            key="sidebar_threshold_k",
+        )
+        state.set("k", float(k_value))
+    else:
+        min_duration_value = st.slider(
+            "Minimum peak duration (s)",
+            min_value=0.0,
+            max_value=20.0,
+            value=float(state.get("min_peak_duration_s", 5.0)),
+            step=0.5,
+            help=(
+                "Episodes shorter than this are treated as noise, not peaks. Default (5s) "
+                "was calibrated against the low_activity class: it removes ~59% of spurious "
+                "short episodes there while keeping ~76% of real events in oscillatory classes."
+            ),
+            key="sidebar_min_peak_duration",
+        )
+        state.set("min_peak_duration_s", float(min_duration_value))
 
     stim_time = st.number_input(
         "Stimulus time (s)",

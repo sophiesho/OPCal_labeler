@@ -56,7 +56,10 @@ def test_pre_post_sd_rect_params_computes_expected_bounds():
     assert y0_pre == pytest.approx(0.0)
     assert y1_pre == pytest.approx(1e-9)
     assert y0_post == pytest.approx(1.0)
-    assert y1_post == pytest.approx(1.0 + 3.0 * robust_sd_from_mad(x[2:] - 1.0))
+    # Post rectangle height is now scaled by the PRE-stim (baseline) SD, not
+    # the post segment's own SD, so real post-stim activity doesn't inflate
+    # the noise estimate used for the band.
+    assert y1_post == pytest.approx(1.0 + 3.0 * robust_sd_from_mad(x[:2] - 0.0))
 
 
 def test_pre_post_sd_rect_params_zero_reference():

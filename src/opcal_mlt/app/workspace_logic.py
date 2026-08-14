@@ -116,6 +116,7 @@ def process_trace_for_cell(s):
 
     detection_method = str(s.get("detection_method", "sd_k"))
     zv_diagnostics = {}
+    peak_episodes = []  # list of (start_idx, end_idx) in x_s index space, for shading
     if detection_method == "adaptive_zv":
         min_peak_duration_s = float(s.get("min_peak_duration_s", 5.0))
         zv_result = pkzv.normalize_to_zv(x_s, fs_hz)
@@ -124,7 +125,17 @@ def process_trace_for_cell(s):
             method="histogram_valley",
             min_peak_duration_sec=min_peak_duration_s,
         )
-        peaks = state_result["peak_indices"]
+        # One marker per episode, at its local max, instead of a dense dot
+        # for every frame inside the episode — the region itself is shaded
+        # separately (see peak_episodes) so the plot reads as "region + peak"
+        # rather than a string of beads.
+        episodes = state_result.get("episodes", [])
+        peak_episodes = list(episodes)
+        peak_list = []
+        for ep_start, ep_end in episodes:
+            local_max_offset = int(np.argmax(x_s[ep_start:ep_end + 1]))
+            peak_list.append(ep_start + local_max_offset)
+        peaks = np.array(peak_list, dtype=int)
         # Reflect the adaptive threshold back into original ΔF/F units so the
         # existing plot (which draws `thr` in raw units) stays meaningful.
         thr = zv_result["baseline"] + state_result["high_threshold"] * zv_result["nu"]
@@ -191,4 +202,5 @@ def process_trace_for_cell(s):
         "y_range": y_range,
         "detection_method": detection_method,
         "zv_diagnostics": zv_diagnostics,
+        "peak_episodes": peak_episodes,
     }

@@ -104,7 +104,25 @@ def make_workspace_figure(
             opacity=1.0, layer="below",
         )
 
-    # Peaks
+    # Detected peak-episode regions (adaptive_zv method only): shade the whole
+    # region so it reads as "this stretch was flagged", rather than a dense
+    # scatter of one dot per frame.
+    peak_episodes = data.get("peak_episodes") or []
+    if peak_episodes:
+        for ep_start, ep_end in peak_episodes:
+            ep_start = max(0, min(int(ep_start), len(t) - 1))
+            ep_end = max(0, min(int(ep_end), len(t) - 1))
+            if ep_end < ep_start:
+                continue
+            fig.add_shape(
+                type="rect", xref="x", yref="paper",
+                x0=float(t[ep_start]), x1=float(t[ep_end]), y0=0, y1=1,
+                line=dict(width=0),
+                fillcolor=theme.get("shade_peak_episode", "rgba(147,51,234,0.12)"),
+                opacity=1.0, layer="below",
+            )
+
+    # Peaks: one marker per detected episode, at its local max
     peaks = data.get("peaks")
     if peaks is not None:
         try:
@@ -119,6 +137,7 @@ def make_workspace_figure(
                 y=data["x_s"][peaks],
                 mode="markers",
                 name="peaks",
+                marker=dict(size=9, symbol="diamond", line=dict(width=1)),
             )
         )
 

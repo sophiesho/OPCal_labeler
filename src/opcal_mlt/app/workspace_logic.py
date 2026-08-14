@@ -11,6 +11,7 @@ import streamlit as st
 
 from opcal_mlt.core import preprocess as pp
 from opcal_mlt.core import peaks as pk
+from opcal_mlt.core import peaks_zv as pkzv
 
 
 __all__ = [
@@ -109,11 +110,32 @@ def process_trace_for_cell(s):
     else:
         sd_const = pp.robust_sd_from_mad(x_s - base_display)
 
-    # Threshold vector used for peak detection and features
+    # Threshold vector used for display and (sd_k method) peak detection
     base = base_display
     thr = base_display + float(k) * float(sd_const)
 
-    peaks = pk.detect_peaks(x_s, thr, fs_hz, min_distance_s=1.0)
+    detection_method = str(s.get("detection_method", "sd_k"))
+    zv_diagnostics = {}
+    if detection_method == "adaptive_zv":
+        min_peak_duration_s = float(s.get("min_peak_duration_s", 5.0))
+        zv_result = pkzv.normalize_to_zv(x_s, fs_hz)
+        state_result = pkzv.detect_peaks_with_states(
+            zv_result["zv"], fs_hz,
+            method="histogram_valley",
+            min_peak_duration_sec=min_peak_duration_s,
+        )
+        peaks = state_result["peak_indices"]
+        # Reflect the adaptive threshold back into original ΔF/F units so the
+        # existing plot (which draws `thr` in raw units) stays meaningful.
+        thr = zv_result["baseline"] + state_result["high_threshold"] * zv_result["nu"]
+        zv_diagnostics = {
+            "nu": zv_result["nu"],
+            "n_peaks": state_result["n_peaks"],
+            "raw_n_peaks": state_result["raw_n_peaks"],
+            "min_peak_duration_s": min_peak_duration_s,
+        }
+    else:
+        peaks = pk.detect_peaks(x_s, thr, fs_hz, min_distance_s=1.0)
     t = np.arange(x.size) / fs_hz
 
     # Parameters for floating SD·k rectangles (pre/post), independent of baseline UI
@@ -167,4 +189,6 @@ def process_trace_for_cell(s):
         "rect_y1_post": float(y1_post),
         "y_scale_mode": scale_mode,
         "y_range": y_range,
+        "detection_method": detection_method,
+        "zv_diagnostics": zv_diagnostics,
     }

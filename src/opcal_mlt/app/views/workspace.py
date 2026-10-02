@@ -74,8 +74,40 @@ def render(*, state: StateAdapter, labeling_service: LabelingService) -> None:
 
     with right:
         _render_label_controls(state, labeling_service, data)
+        _render_plateau_qc(data, theme)
 
     render_session_diagnostics(s)
+
+
+def _render_plateau_qc(data: dict, theme: dict) -> None:
+    """HF vs HO check: area above the plateau line, compared with reference cells.
+
+    A labeling aid only — it never changes the label. Computed on the loaded
+    trace (``x``) with the session's sampling rate and stimulus time.
+    """
+    from opcal_mlt.app.plots import make_plateau_qc_figure
+    from opcal_mlt.core import plateau_qc
+
+    with st.expander("HF vs HO check", expanded=False):
+        try:
+            ref = plateau_qc.load_reference()
+            score = plateau_qc.area_above_plateau(
+                np.asarray(data["x"], dtype=float),
+                float(data["fs_hz"]),
+                float(data.get("stim_time_s", 0.0)),
+            )
+            pos = ref.position(score)
+        except Exception as exc:  # never block labeling because of the aid
+            st.caption(f"Check unavailable: {exc}")
+            return
+        st.metric("Area above plateau", f"{score:.2f}", help="ΔF/F·s per minute, from the stimulus to the end")
+        st.markdown(f"**{pos['verdict']}** · HF percentile {pos['percentile_in_HF']:.0f} · HO percentile {pos['percentile_in_HO']:.0f}")
+        st.plotly_chart(make_plateau_qc_figure(ref, score, theme), use_container_width=True)
+        st.caption(
+            "Separates HO from HF in the reference set (ROC AUC ≈ 0.97). "
+            "Meaningful only when choosing between HF and HO. Depends on the sampling rate and "
+            "stimulus time set in the sidebar."
+        )
 
 
 def _render_label_controls(
@@ -150,7 +182,7 @@ def _handle_save_label(
         return
 
     try:
-        trace_set = TraceSet(traces=s.traces, cell_ids=s.cell_ids, fs_hz=float(s.get("fs_hz", 1.08)))
+        trace_set = TraceSet(traces=s.traces, cell_ids=s.cell_ids, fs_hz=float(s.get("fs_hz", 1 / 1.08)))
     except Exception as exc:
         st.error(f"Invalid trace configuration: {exc}")
         return

@@ -135,7 +135,7 @@ def _initialize_state() -> None:
         "cell_ids": None,
         "session_dir": "",
         "history": [],
-        "fs_hz": 1.08,
+        "fs_hz": 1 / 1.08,  # 1 frame every 1.08 s
         "smooth": True,
         "window": 31,
         "poly": 3,
@@ -183,7 +183,7 @@ def _ensure_session_directory(state: StateAdapter, session_service: SessionServi
         created_at=datetime.now(timezone.utc),
     )
     metadata = {
-        "fs_hz": float(st.session_state.get("fs_hz", 1.08)),
+        "fs_hz": float(st.session_state.get("fs_hz", 1 / 1.08)),
         "started_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "app_version": APP_VERSION,
         "source_path": str(st.session_state.get("source_filename", "")),

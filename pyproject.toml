@@ -41,6 +41,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
 "opcal_mlt.app" = ["main.py", "assets/*.png", "config/*.toml"]
+"opcal_mlt.core" = ["data/*.json"]
 
 
 [tool.versioning]

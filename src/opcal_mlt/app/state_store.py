@@ -41,6 +41,7 @@ _SIMPLE_KEYS: tuple[str, ...] = (
     "show_raw",
     "show_smoothed",
     "stim_time_s",
+    "stim_unit",
     "baseline_method",
     "window_s",
     "k",

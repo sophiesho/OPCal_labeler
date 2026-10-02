@@ -183,3 +183,45 @@ def make_status_figure(status: np.ndarray, theme: Dict, *, height: int = 90) -> 
     fig.update_layout(height=height, margin=dict(l=4, r=4, t=4, b=4))
     apply_plotly_theme(fig, theme)
     return fig
+
+
+def make_plateau_qc_figure(
+    reference,
+    score: float,
+    theme: Dict,
+    *,
+    height: int = 220,
+) -> go.Figure:
+    """Small histogram of the HF / HO reference scores with the current cell marked.
+
+    Args:
+        reference: ``opcal_mlt.core.plateau_qc.Reference`` with ``hf``, ``ho`` and ``threshold``.
+        score: Score of the current cell (ΔF/F·s per minute).
+        theme: Palette dictionary.
+        height: Figure height in pixels.
+    """
+    # log-spaced bins: the score spans ~2 orders of magnitude
+    pos = np.concatenate([reference.hf, reference.ho])
+    pos = pos[pos > 0]
+    lo = np.log10(max(1e-2, float(np.min(pos)) if pos.size else 1e-2))
+    hi = np.log10(max(float(np.max(pos)) if pos.size else 10.0, 10.0))
+    edges = np.logspace(lo, hi, 30)
+    centers = np.sqrt(edges[:-1] * edges[1:])
+    fig = go.Figure()
+    for vals, name, color in (
+        (reference.hf, "HF (reference)", "rgba(255,140,0,0.55)"),
+        (reference.ho, "HO (reference)", "rgba(214,39,40,0.55)"),
+    ):
+        counts, _ = np.histogram(np.clip(vals, edges[0], edges[-1]), bins=edges)
+        fig.add_trace(go.Bar(x=centers, y=counts, name=name, marker_color=color,
+                             width=np.diff(edges), hovertemplate="%{y} cells<extra>" + name + "</extra>"))
+    fig.add_vline(x=float(reference.threshold), line_dash="dot", line_color=theme.get("muted", "#6b7280"))
+    if np.isfinite(score):
+        fig.add_vline(x=float(np.clip(score, edges[0], edges[-1])), line_width=3,
+                      line_color=theme.get("accent", "#2563eb"))
+    fig.update_layout(barmode="overlay", height=height, margin=dict(l=10, r=10, t=10, b=30),
+                      legend=dict(orientation="h", y=1.15, x=0, font=dict(size=10)), bargap=0)
+    fig.update_xaxes(type="log", title_text="area above plateau (ΔF/F·s/min)", title_font=dict(size=10))
+    fig.update_yaxes(title_text="cells", title_font=dict(size=10))
+    apply_plotly_theme(fig, theme)
+    return fig

@@ -147,6 +147,21 @@ Workflow tips:
 
 ---
 
+
+### Acquisition settings (sidebar)
+
+- **Frame interval (s per frame)** — time between frames. OPC recordings: **1.08** (one frame every 1.08 s; the sidebar shows the equivalent sampling rate, 0.926 Hz). Enter seconds per frame, not frames per second.
+- **Stimulus given as** — choose **frame number** (how the lab logs glutamate administration) or **seconds**. The other unit is shown underneath; the app stores seconds internally.
+
+### HF vs HO check (labeling aid)
+
+The right-hand column has a collapsible **HF vs HO check** panel. It computes one score for the current cell — the **area above the plateau line** (a 150 s rolling median), from the stimulus to the end, in ΔF/F·s per minute — and shows where that score falls among reference High Flat and High Oscillatory cells (histogram; blue line = this cell, dotted line = threshold).
+
+- **HO-like / HF-like / ambiguous** summarises the position; the percentiles tell you how typical the value is for each class.
+- It is an aid only: it never changes or suggests a label, and it is meaningful only when deciding between HF and HO.
+- It depends on the **Sampling rate** and **Stimulus time** set in the sidebar — check them first.
+- Reference: OPCal labelled set, deduplicated (293 HF, 230 HO), Oct 2026; ROC AUC ≈ 0.97. Packaged as `core/data/plateau_qc_reference_v1.json`.
+
 ## Stage 4 — Finish & export
 
 > Goal: review outcomes and create an archive for sharing.

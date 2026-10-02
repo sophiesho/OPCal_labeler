@@ -8,6 +8,9 @@ import streamlit as st
 
 from opcal_mlt.app.state import StateAdapter
 
+DEFAULT_FRAME_INTERVAL_S = 1.08  # s per frame (OPC recordings)
+DEFAULT_FS_HZ = 1.0 / DEFAULT_FRAME_INTERVAL_S
+
 # Define UI option lists near the top so the choices remain centralized.
 _BASELINE_OPTIONS: Sequence[Tuple[str, str]] = (
     ("rolling_median", "Rolling median (window)"),
@@ -46,17 +49,24 @@ def render_sidebar_params(state: StateAdapter) -> None:
 
 
 def _render_sampling_section(state: StateAdapter) -> None:
+    """Acquisition timing. The lab specifies time per frame (e.g. 1 frame every 1.08 s);
+    internally the app keeps the sampling rate ``fs_hz = 1 / frame_interval_s``."""
     st.markdown("#### Acquisition")
-    fs_hz = st.number_input(
-        "Sampling rate (Hz)",
-        min_value=0.01,
-        value=float(state.get("fs_hz", 1.08)),
+    fs_current = float(state.get("fs_hz", DEFAULT_FS_HZ))
+    frame_interval = st.number_input(
+        "Frame interval (s per frame)",
+        min_value=0.001,
+        value=float(round(1.0 / fs_current, 4)) if fs_current > 0 else DEFAULT_FRAME_INTERVAL_S,
         step=0.01,
-        format="%.2f",
-        help="Default is 1.08 Hz (≈0.93 s/sample)",
-        key="sidebar_sampling_rate",
+        format="%.3f",
+        help=(
+            "Time between two consecutive frames, in seconds. OPC recordings: 1 frame every "
+            "1.08 s (= sampling rate 0.926 Hz). Not frames per second."
+        ),
+        key="sidebar_frame_interval",
     )
-    state.set("fs_hz", float(fs_hz))
+    state.set("fs_hz", 1.0 / float(frame_interval))
+    st.caption(f"Sampling rate = {1.0 / float(frame_interval):.3f} Hz")
 
 
 def _render_visibility_section(state: StateAdapter) -> None:
@@ -207,14 +217,38 @@ def _render_threshold_section(state: StateAdapter) -> None:
         )
         state.set("min_peak_duration_s", float(min_duration_value))
 
-    stim_time = st.number_input(
-        "Stimulus time (s)",
-        min_value=0.0,
-        value=float(state.get("stim_time_s", 50.0)),
-        step=1.0,
-        help="Timestamp at which stimulation starts; used to split pre/post statistics.",
-        key="sidebar_stim_time",
+    # Stimulus: the lab often logs it as a frame number; the app stores seconds.
+    fs_now = float(state.get("fs_hz", DEFAULT_FS_HZ))
+    unit = st.radio(
+        "Stimulus given as",
+        ["frame number", "seconds"],
+        index=0 if state.get("stim_unit", "frame number") == "frame number" else 1,
+        horizontal=True,
+        key="sidebar_stim_unit",
     )
+    state.set("stim_unit", unit)
+    stim_s_current = float(state.get("stim_time_s", 50.0))
+    if unit == "frame number":
+        stim_frame = st.number_input(
+            "Stimulus frame",
+            min_value=0,
+            value=int(round(stim_s_current * fs_now)),
+            step=1,
+            help="Frame at which the stimulus was given (counted from the first frame of the loaded trace).",
+            key="sidebar_stim_frame",
+        )
+        stim_time = float(stim_frame) / fs_now
+        st.caption(f"= {stim_time:.1f} s")
+    else:
+        stim_time = st.number_input(
+            "Stimulus time (s)",
+            min_value=0.0,
+            value=stim_s_current,
+            step=1.0,
+            help="Timestamp at which stimulation starts; used to split pre/post statistics.",
+            key="sidebar_stim_time",
+        )
+        st.caption(f"= frame {round(float(stim_time) * fs_now)}")
     state.set("stim_time_s", float(stim_time))
 
 

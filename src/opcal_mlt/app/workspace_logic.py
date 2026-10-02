@@ -83,7 +83,7 @@ def process_trace_for_cell(s):
         The returned structure intentionally mirrors ``make_workspace_figure`` to
         keep Streamlit pages declarative.
     """
-    fs_hz = float(s.get("fs_hz", 1.08))
+    fs_hz = float(s.get("fs_hz", 1 / 1.08))
     smooth = bool(s.get("smooth", True))
     window = int(s.get("window", 31))
     poly = int(s.get("poly", 3))
